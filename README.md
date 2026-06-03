@@ -16,23 +16,27 @@ The agent never reads documents directly. Instead, it calls tools on an MCP (Mod
 
 ## The Five Strategies
 
-| # | Strategy | How it works | Expected behavior |
-|---|----------|-------------|-------------------|
-| 0 | **Pure LLM** | No retrieval. LLM answers from parametric knowledge only. | Baseline — shows what RAG adds. |
-| 1 | **Naive RAG** | Retrieves all documents. System prompt says "don't reveal restricted info." | High leakage risk. The model sees everything and is told to keep secrets. |
-| 2 | **Post-Retrieval Filtering** | Retrieves all documents, filters by access level before injecting into context. | Context is clean, but retrieval ranking may be influenced by restricted docs. |
-| 3 | **Pre-Retrieval Filtering** | Retrieves only from documents within the user's scope. Restricted docs are never searched. | Strictest. Zero leakage risk, but may reduce answer quality. |
-| 4 | **Taint-Aware Output Guard** | Retrieves everything (with access labels). Generates an answer. A PolicyEngine checks the output for leakage and blocks it if detected. | Middle ground — attempts to recover utility while catching leakage post-generation. |
+
+| #   | Strategy                     | How it works                                                                                                                            | Expected behavior                                                                   |
+| --- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| 0   | **Pure LLM**                 | No retrieval. LLM answers from parametric knowledge only.                                                                               | Baseline — shows what RAG adds.                                                     |
+| 1   | **Naive RAG**                | Retrieves all documents. System prompt says "don't reveal restricted info."                                                             | High leakage risk. The model sees everything and is told to keep secrets.           |
+| 2   | **Post-Retrieval Filtering** | Retrieves all documents, filters by access level before injecting into context.                                                         | Context is clean, but retrieval ranking may be influenced by restricted docs.       |
+| 3   | **Pre-Retrieval Filtering**  | Retrieves only from documents within the user's scope. Restricted docs are never searched.                                              | Strictest. Zero leakage risk, but may reduce answer quality.                        |
+| 4   | **Taint-Aware Output Guard** | Retrieves everything (with access labels). Generates an answer. A PolicyEngine checks the output for leakage and blocks it if detected. | Middle ground — attempts to recover utility while catching leakage post-generation. |
+
 
 ## Access Tiers
 
 Every document has an access level. Every user has a JWT token with a scope claim.
 
-| Scope Token | Sees | Who |
-|-------------|------|-----|
-| `docs:public` | Public docs only | Customers, prospects |
-| `docs:internal` | Public + internal | All employees |
-| `docs:confidential` | Everything | Leadership, HR, Legal, Finance |
+
+| Scope Token         | Sees              | Who                            |
+| ------------------- | ----------------- | ------------------------------ |
+| `docs:public`       | Public docs only  | Customers, prospects           |
+| `docs:internal`     | Public + internal | All employees                  |
+| `docs:confidential` | Everything        | Leadership, HR, Legal, Finance |
+
 
 ## Document Corpus
 
@@ -53,20 +57,22 @@ Full manifest: see `scopeguard_document_manifest.md`.
 
 ## Tech Stack
 
-| Component | Technology |
-|-----------|-----------|
-| Language | Python 3.11+ |
-| Package manager | uv |
-| Data models | Pydantic |
-| Embeddings | sentence-transformers (`all-MiniLM-L6-v2`, 384-dim) |
-| Vector store | FAISS (`IndexFlatIP`, cosine similarity via normalized inner product) |
-| LLM (generation) | OpenAI `gpt-4o-mini` (temperature=0.0 for reproducibility) |
-| LLM (judge) | OpenAI `gpt-4o` (stronger model to reduce self-bias) |
-| MCP server | FastMCP v3 |
-| Auth tokens | PyJWT (HS256-signed JWTs with scope claims) |
-| Linting | ruff |
-| Type checking | mypy |
-| Testing | pytest |
+
+| Component        | Technology                                                            |
+| ---------------- | --------------------------------------------------------------------- |
+| Language         | Python 3.13+                                                          |
+| Package manager  | uv                                                                    |
+| Data models      | Pydantic                                                              |
+| Embeddings       | sentence-transformers (`all-MiniLM-L6-v2`, 384-dim)                   |
+| Vector store     | FAISS (`IndexFlatIP`, cosine similarity via normalized inner product) |
+| LLM (generation) | OpenAI `gpt-4o-mini` (temperature=0.0 for reproducibility)            |
+| LLM (judge)      | OpenAI `gpt-4o` (stronger model to reduce self-bias)                  |
+| MCP server       | FastMCP v3                                                            |
+| Auth tokens      | PyJWT (HS256-signed JWTs with scope claims)                           |
+| Linting          | ruff                                                                  |
+| Type checking    | mypy                                                                  |
+| Testing          | pytest                                                                |
+
 
 ## Project Structure
 
@@ -120,6 +126,9 @@ git clone <repo-url>
 cd scopeguard-rag
 uv sync
 
+# Install the pre-commit hooks (ruff, ruff-format, mypy run on commit; tests are run manually)
+uv run pre-commit install
+
 # Set up your API key
 cp .env.example .env
 # Edit .env and add your OPENAI_API_KEY
@@ -155,15 +164,17 @@ uv run python -m src.mcp_server
 
 Each question is run against all 5 strategies at all 3 scope levels. Metrics:
 
-| Metric | How measured |
-|--------|-------------|
-| Answer correctness | LLM-as-judge (0–3 scale) |
-| Citation accuracy | Automated — cited doc IDs vs gold doc IDs |
-| Refusal precision | LLM-as-judge — is the refusal justified? |
-| Refusal recall | LLM-as-judge — did it refuse when it should have? |
-| Direct leakage | Automated — n-gram overlap + restricted citation checks |
-| Indirect leakage | LLM-as-judge — is the answer influenced by restricted docs? |
-| Adversarial robustness | Automated — pass/fail on adversarial test cases |
+
+| Metric                 | How measured                                                |
+| ---------------------- | ----------------------------------------------------------- |
+| Answer correctness     | LLM-as-judge (0–3 scale)                                    |
+| Citation accuracy      | Automated — cited doc IDs vs gold doc IDs                   |
+| Refusal precision      | LLM-as-judge — is the refusal justified?                    |
+| Refusal recall         | LLM-as-judge — did it refuse when it should have?           |
+| Direct leakage         | Automated — n-gram overlap + restricted citation checks     |
+| Indirect leakage       | LLM-as-judge — is the answer influenced by restricted docs? |
+| Adversarial robustness | Automated — pass/fail on adversarial test cases             |
+
 
 Results are saved to `data/evaluation_results.json` (automated metrics) and `data/evaluation_results_judged.json` (with judge scores).
 
@@ -179,19 +190,20 @@ Results are saved to `data/evaluation_results.json` (automated metrics) and `dat
 
 ## Project Phases
 
-| Phase | What | Tasks |
-|-------|------|-------|
-| 1 | Corpus + baseline | T00 scaffold, T01 document parser, T02 embeddings, T03 retriever, T04 generator, T05 strategy 0, T06 strategy 1 |
-| 2 | MCP + filtering | T07 auth + MCP server, T08 strategy 2, T09 test set, T11 strategy 3 |
-| 3 | Taint-aware guard | T12 PolicyEngine, T13 strategy 4 |
-| 4 | Evaluation + report | T10 evaluation harness, T14 LLM-as-judge, T15 results & report |
 
-Full task specs with interfaces, code, acceptance criteria, and dependencies: see `task_specs.md`.
+| Phase | What                | Tasks                                                                                                           |
+| ----- | ------------------- | --------------------------------------------------------------------------------------------------------------- |
+| 1     | Corpus + baseline   | T00 scaffold, T01 document parser, T02 embeddings, T03 retriever, T04 generator, T05 strategy 0, T06 strategy 1 |
+| 2     | MCP + filtering     | T07 auth + MCP server, T08 strategy 2, T09 test set, T11 strategy 3                                             |
+| 3     | Taint-aware guard   | T12 PolicyEngine, T13 strategy 4                                                                                |
+| 4     | Evaluation + report | T10 evaluation harness, T14 LLM-as-judge, T15 results & report                                                  |
+
+
+Full task specs with interfaces, code, acceptance criteria, and dependencies are found in GitHub Projects of this repo.
 
 ## Key Files to Read First
 
 1. **This README** — you are here
-2. **`task_specs.md`** — complete task breakdown with code and acceptance criteria
-3. **`scopeguard_document_manifest.md`** — full list of all 45 documents with summaries
-4. **`src/models.py`** — shared Pydantic data structures used everywhere
-5. **`src/strategies/base.py`** — the StrategyBase interface every strategy implements
+2. `**src/models.py`** — shared Pydantic data structures used everywhere
+3. `**src/strategies/base.py`** — the StrategyBase interface every strategy implements
+
