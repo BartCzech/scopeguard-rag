@@ -13,4 +13,3 @@ class StrategyBase(ABC):
     @abstractmethod
     def answer(self, query: str, user_context: UserContext) -> StrategyResult:
         """Given a query and user context, return a full strategy result."""
-  
