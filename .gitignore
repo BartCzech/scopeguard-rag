@@ -1,1 +1,22 @@
 .DS_Store
+.idea
+
+# Data
+data/index/
+
+# Environment
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# uv
+.venv/
+
+# OS
+.DS_Store
