@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 
-from models import GenerationResult, RetrievalResult, UserContext
 from pydantic import BaseModel
+
+from models import GenerationResult, RetrievalResult, UserContext
 
 
 class StrategyResult(BaseModel):
