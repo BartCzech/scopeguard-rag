@@ -16,8 +16,8 @@ from corpus_loader import load_corpus  # noqa: E402
 from models import Chunk, Document  # noqa: E402
 
 # ── Configuration (constants, not tuneable at runtime) ──
-CHUNK_MAX_WORDS = 250
-CHUNK_OVERLAP_WORDS = 50
+CHUNK_MAX_WORDS = 150
+CHUNK_OVERLAP_WORDS = 30
 MODEL_NAME = "all-MiniLM-L6-v2"  # 384-dim embeddings
 EMBEDDING_DIM = 384
 INDEX_DIR = "data/index"
