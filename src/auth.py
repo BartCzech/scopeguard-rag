@@ -8,7 +8,7 @@ from models import UserContext
 
 # In production this comes from env/secrets manager and settings.py or equivalent.
 # Simplification for a research project.
-SECRET = "scopeguard-dev-secret"
+SECRET = "scopeguard-dev-secret-longer-means-safer"
 ALGORITHM = "HS256"
 TOKEN_LIFETIME_HOURS = 24
 
