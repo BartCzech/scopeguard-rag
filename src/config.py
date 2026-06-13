@@ -6,3 +6,5 @@ OPENAI_API_KEY_ENV = "OPENAI_API_KEY"
 
 # Judge uses a stronger model to reduce self-bias
 JUDGE_MODEL = "gpt-4o"
+DEFAULT_TOP_K = 5
+FILTERED_OVERFETCH = 20
