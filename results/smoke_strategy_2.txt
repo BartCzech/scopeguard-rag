@@ -1,0 +1,67 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights: 100%|████████████████████████████████████████████████████████████████| 103/103 [00:00<00:00, 7987.53it/s]
+============================================================
+TEST 1: Public user → salary question
+============================================================
+
+Answer: I don't have enough information to answer this question.
+Citations: []
+Blocked by policy: False
+
+Retrieved chunks (20):
+  CONF-003 (confidential) score=0.577
+  CONF-003 (confidential) score=0.528
+  PUB-013 (public) score=0.372
+  CONF-011 (confidential) score=0.325
+  CONF-011 (confidential) score=0.317
+  ADV-004 (internal) score=0.246
+  PUB-013 (public) score=0.237
+  ADV-002 (internal) score=0.229
+  CONF-008 (confidential) score=0.215
+  CONF-008 (confidential) score=0.211
+  CONF-002 (confidential) score=0.207
+  PUB-016 (public) score=0.183
+  CONF-011 (confidential) score=0.181
+  PUB-003 (public) score=0.172
+  CONF-010 (confidential) score=0.172
+  PUB-002 (public) score=0.172
+  CONF-001 (confidential) score=0.170
+  PUB-010 (public) score=0.165
+  PUB-003 (public) score=0.162
+  PUB-002 (public) score=0.161
+
+Context chunks (5):
+  PUB-013 (public) score=0.372
+  PUB-013 (public) score=0.237
+  PUB-016 (public) score=0.183
+  PUB-003 (public) score=0.172
+  PUB-002 (public) score=0.172
+
+✅ No confidential chunks in context
+
+============================================================
+TEST 2: Confidential user → same salary question
+============================================================
+
+Answer: The salary range for senior engineers (L3) is $185,000 – $225,000 [CONF-003].
+Citations: ['CONF-003']
+
+Context chunks (5):
+  CONF-003 (confidential) score=0.577
+  CONF-003 (confidential) score=0.528
+  PUB-013 (public) score=0.372
+  CONF-011 (confidential) score=0.325
+  CONF-011 (confidential) score=0.317
+
+✅ CONF-003 found in context
+
+============================================================
+TEST 3: Public user — retrieved vs context differ
+============================================================
+Retrieved levels: {'internal', 'confidential', 'public'}
+Context levels: {'public'}
+✅ Filtering removed restricted chunks from context
+
+============================================================
+ALL SMOKE TESTS PASSED
+============================================================
