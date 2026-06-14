@@ -1,6 +1,7 @@
 """Shared fakes for strategy and evaluation tests."""
 
 from models import GenerationResult, RetrievalResult
+from policy_engine import LeakageCheckResult
 
 
 def make_chunk(doc_id: str, access_level: str, score: float) -> RetrievalResult:
@@ -64,3 +65,23 @@ class FakeGenerator:
             cited_doc_ids=[],
             raw_response=self.answer,
         )
+
+
+class FakePolicyEngine:
+    """Predictable PolicyEngine that returns pre-set results."""
+
+    def __init__(self, leaked: bool = False, ngram_score: float = 0.0):
+        self.leaked = leaked
+        self.ngram_score = ngram_score
+        self.last_answer: str | None = None
+        self.last_restricted_chunks: list | None = None
+
+    def check(self, answer, restricted_chunks, allowed_doc_ids):
+        self.last_answer = answer
+        self.last_restricted_chunks = restricted_chunks
+        result = LeakageCheckResult()
+        result.leaked = self.leaked
+        result.ngram_score = self.ngram_score
+        if self.leaked:
+            result.reasons = ["Fake: leakage detected"]
+        return result
