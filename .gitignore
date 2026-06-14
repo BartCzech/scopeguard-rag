@@ -2,7 +2,7 @@
 .idea
 
 # Data
-data/index/
+data/
 
 # Environment
 .env
@@ -17,6 +17,7 @@ __pycache__/
 
 # uv
 .venv/
+node_modules/
 
 # OS
 .DS_Store
