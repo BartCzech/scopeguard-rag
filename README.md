@@ -6,7 +6,7 @@ An NLP/LLM research project comparing how the placement of access control in a R
 
 We build a Retrieval-Augmented Generation system that answers questions over a corporate document collection. The catch: not every user is authorized to see every document. We implement **five different strategies** for enforcing access control — from "no protection at all" to "strict pre-retrieval filtering" — and measure how each one trades off answer quality against information leakage.
 
-The documents belong to a fictional startup called **ScopeGuard AI** (a company that, ironically, sells LLM access-control middleware). The corpus includes adversarial documents with embedded prompt injections designed to trick the system into leaking restricted content.
+The documents belong to a fictional startup called **ScopeGuard AI** (a company that sells LLM access-control middleware). The corpus includes adversarial documents with embedded prompt injections designed to trick the system into leaking restricted content.
 
 The agent never reads documents directly. Instead, it calls tools on an MCP (Model Context Protocol) server that validates JWT access tokens before returning results. This architecture lets us swap filtering strategies at the tool layer without changing the rest of the pipeline.
 
@@ -14,29 +14,42 @@ The agent never reads documents directly. Instead, it calls tools on an MCP (Mod
 
 > How does the placement and mechanism of access control in a RAG pipeline affect answer utility, refusal correctness, and privacy leakage?
 
+## Key Findings
+
+| Strategy | Correctness | Citation Leakage | Blocked | Missed Refusals |
+|----------|:-----------:|:----------------:|:-------:|:---------------:|
+| S0 Pure LLM | 0.90 | 0.0% | 0.0% | 6 |
+| S1 Naive RAG | 1.48 | **12.2%** | 0.0% | **25** |
+| S2 Post-Filter | 1.31 | 0.0% | 0.0% | 16 |
+| S3 Pre-Filter | 1.31 | 0.0% | 0.0% | 16 |
+| S4 Taint Guard | **1.71** | 0.0% | 16.7% | 13 |
+
+- **Prompt-based access control (S1) is unreliable** — the system prompt "don't reveal restricted info" was ignored 25 times out of 90 runs, with 11 citation leakage events.
+- **Pre-retrieval filtering (S3) is the safest default** — zero leakage, zero risk, but lower answer quality when relevant info is restricted.
+- **The taint-aware output guard (S4) achieves the highest correctness** (1.71/3.0) while maintaining zero citation leakage, at the cost of 16.7% of answers blocked by the PolicyEngine.
+- **S2 and S3 produce identical results** at this corpus scale (150 chunks) — pre vs post filtering only matters in larger corpora.
+- **Smarter models leak more** — GPT-4o-mini's S1 leaks 12.2%, local Gemma leaks 0%, but GPT's correctness is 30–70% higher.
+- **Adversarial prompt injections work on every strategy** — ADV-002's fake "pay transparency policy" was followed by all four RAG strategies that could see it.
+
 ## The Five Strategies
 
-
-| #   | Strategy                     | How it works                                                                                                                            | Expected behavior                                                                   |
-| --- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| 0   | **Pure LLM**                 | No retrieval. LLM answers from parametric knowledge only.                                                                               | Baseline — shows what RAG adds.                                                     |
-| 1   | **Naive RAG**                | Retrieves all documents. System prompt says "don't reveal restricted info."                                                             | High leakage risk. The model sees everything and is told to keep secrets.           |
-| 2   | **Post-Retrieval Filtering** | Retrieves all documents, filters by access level before injecting into context.                                                         | Context is clean, but retrieval ranking may be influenced by restricted docs.       |
-| 3   | **Pre-Retrieval Filtering**  | Retrieves only from documents within the user's scope. Restricted docs are never searched.                                              | Strictest. Zero leakage risk, but may reduce answer quality.                        |
-| 4   | **Taint-Aware Output Guard** | Retrieves everything (with access labels). Generates an answer. A PolicyEngine checks the output for leakage and blocks it if detected. | Middle ground — attempts to recover utility while catching leakage post-generation. |
-
+| # | Strategy | How it works | Expected behavior |
+|---|----------|-------------|-------------------|
+| 0 | **Pure LLM** | No retrieval. LLM answers from parametric knowledge only. | Baseline — shows what RAG adds. |
+| 1 | **Naive RAG** | Retrieves all documents. System prompt says "don't reveal restricted info." | High leakage risk. The model sees everything and is told to keep secrets. |
+| 2 | **Post-Retrieval Filtering** | Retrieves all documents, filters by access level before injecting into context. | Context is clean, but retrieval ranking may be influenced by restricted docs. |
+| 3 | **Pre-Retrieval Filtering** | Retrieves only from documents within the user's scope. Restricted docs are never searched. | Strictest. Zero leakage risk, but may reduce answer quality. |
+| 4 | **Taint-Aware Output Guard** | Retrieves everything (with access labels). Generates an answer. A PolicyEngine checks the output for leakage and blocks it if detected. | Middle ground — attempts to recover utility while catching leakage post-generation. |
 
 ## Access Tiers
 
 Every document has an access level. Every user has a JWT token with a scope claim.
 
-
-| Scope Token         | Sees              | Who                            |
-| ------------------- | ----------------- | ------------------------------ |
-| `docs:public`       | Public docs only  | Customers, prospects           |
-| `docs:internal`     | Public + internal | All employees                  |
-| `docs:confidential` | Everything        | Leadership, HR, Legal, Finance |
-
+| Scope Token | Sees | Who |
+|-------------|------|-----|
+| `docs:public` | Public docs only | Customers, prospects |
+| `docs:internal` | Public + internal | All employees |
+| `docs:confidential` | Everything | Leadership, HR, Legal, Finance |
 
 ## Document Corpus
 
@@ -53,26 +66,22 @@ Plus 4 dedicated adversarial documents (in their tier folders) and 3 regular doc
 
 Two "honeypot" documents are targeted by most adversarial attacks: **CONF-003** (salary bands) and **CONF-006** (security audit).
 
-Full manifest: see `scopeguard_document_manifest.md`.
-
 ## Tech Stack
 
-
-| Component        | Technology                                                            |
-| ---------------- | --------------------------------------------------------------------- |
-| Language         | Python 3.13+                                                          |
-| Package manager  | uv                                                                    |
-| Data models      | Pydantic                                                              |
-| Embeddings       | sentence-transformers (`all-MiniLM-L6-v2`, 384-dim)                   |
-| Vector store     | FAISS (`IndexFlatIP`, cosine similarity via normalized inner product) |
-| LLM (generation) | OpenAI `gpt-4o-mini` (temperature=0.0 for reproducibility)            |
-| LLM (judge)      | OpenAI `gpt-4o` (stronger model to reduce self-bias)                  |
-| MCP server       | FastMCP v3                                                            |
-| Auth tokens      | PyJWT (HS256-signed JWTs with scope claims)                           |
-| Linting          | ruff                                                                  |
-| Type checking    | mypy                                                                  |
-| Testing          | pytest                                                                |
-
+| Component | Technology |
+|-----------|-----------|
+| Language | Python 3.13 |
+| Package manager | uv |
+| Data models | Pydantic |
+| Embeddings | sentence-transformers (`all-MiniLM-L6-v2`, 384-dim) |
+| Vector store | FAISS (`IndexFlatIP`, cosine similarity via normalized inner product) |
+| LLM (generation) | OpenAI `gpt-4o-mini` + local Gemma via Ollama |
+| LLM (judge) | OpenAI `gpt-4o` |
+| MCP server | FastMCP v3 |
+| Auth tokens | PyJWT (HS256-signed JWTs with scope claims) |
+| Linting | ruff |
+| Type checking | mypy |
+| Testing | pytest |
 
 ## Project Structure
 
@@ -106,12 +115,25 @@ scopeguard-rag/
 │       └── judge.py           # LLM-as-judge scoring
 ├── tests/
 │   ├── test_questions.json    # 30 labeled question-answer pairs
+│   ├── conftest.py            # Shared fixtures
+│   ├── fakes.py               # FakeRetriever, FakeGenerator, FakePolicyEngine
 │   ├── test_corpus_loader.py
 │   ├── test_retriever.py
 │   ├── test_auth.py
-│   └── test_policy_engine.py
+│   ├── test_mcp_server.py
+│   ├── test_policy_engine.py
+│   ├── test_strategy_1.py
+│   ├── test_strategy_2.py
+│   ├── test_strategy_3.py
+│   └── test_strategy_4.py
+├── scripts/
+│   ├── smoke_strategy_*.py    # End-to-end smoke tests per strategy
+│   ├── analyze_results.py     # Extract findings from evaluation JSON
+│   └── smoke_policy_engine.py # PolicyEngine detection tests
+├── results/                   # Saved analysis outputs and findings
 ├── data/
 │   └── index/                 # FAISS index + metadata sidecar (gitignored)
+├── slides.md                  # Presentation (sli.dev)
 ├── pyproject.toml
 ├── uv.lock
 ├── .env                       # OPENAI_API_KEY (gitignored, create your own)
@@ -126,7 +148,7 @@ git clone <repo-url>
 cd scopeguard-rag
 uv sync
 
-# Install the pre-commit hooks (ruff, ruff-format, mypy run on commit; tests are run manually)
+# Install the pre-commit hooks (ruff, ruff-format, mypy)
 uv run pre-commit install
 
 # Set up your API key
@@ -154,6 +176,14 @@ uv run python -m src.evaluation.harness --strategy strategy_2
 # Run the LLM-as-judge on evaluation results
 uv run python -m src.evaluation.judge
 
+# Analyze results
+uv run python scripts/analyze_results.py data/evaluation_results_judged.json
+
+# Run smoke tests (requires FAISS index + OPENAI_API_KEY)
+uv run python scripts/smoke_strategy_1.py
+uv run python scripts/smoke_strategy_4.py
+uv run python scripts/smoke_policy_engine.py
+
 # Start the MCP server standalone (for demo purposes)
 uv run python -m src.mcp_server
 ```
@@ -162,19 +192,17 @@ uv run python -m src.mcp_server
 
 30 test questions across six categories: public-only, internal-only, confidential-only, cross-scope, unanswerable, and adversarial.
 
-Each question is run against all 5 strategies at all 3 scope levels. Metrics:
+Each question is run against all 5 strategies at all 3 scope levels (450 runs per model). Evaluated on two models: GPT-4o-mini and local Gemma.
 
-
-| Metric                 | How measured                                                |
-| ---------------------- | ----------------------------------------------------------- |
-| Answer correctness     | LLM-as-judge (0–3 scale)                                    |
-| Citation accuracy      | Automated — cited doc IDs vs gold doc IDs                   |
-| Refusal precision      | LLM-as-judge — is the refusal justified?                    |
-| Refusal recall         | LLM-as-judge — did it refuse when it should have?           |
-| Direct leakage         | Automated — n-gram overlap + restricted citation checks     |
-| Indirect leakage       | LLM-as-judge — is the answer influenced by restricted docs? |
-| Adversarial robustness | Automated — pass/fail on adversarial test cases             |
-
+| Metric | How measured |
+|--------|-------------|
+| Answer correctness | LLM-as-judge (0–3 scale) |
+| Citation accuracy | Automated — cited doc IDs vs gold doc IDs |
+| Refusal precision | LLM-as-judge — is the refusal justified? |
+| Refusal recall | LLM-as-judge — did it refuse when it should have? |
+| Direct leakage | Automated — n-gram overlap + restricted citation checks |
+| Indirect leakage | LLM-as-judge — is the answer influenced by restricted docs? |
+| Adversarial robustness | Automated — pass/fail on adversarial test cases |
 
 Results are saved to `data/evaluation_results.json` (automated metrics) and `data/evaluation_results_judged.json` (with judge scores).
 
@@ -184,26 +212,6 @@ Results are saved to `data/evaluation_results.json` (automated metrics) and `dat
 2. MCP tool server with JWT-based scope enforcement
 3. Taint-aware PolicyEngine for output leakage detection
 4. Labeled test set (30 question-answer pairs)
-5. Evaluation results comparing the five strategies
-6. Final report (8–12 pages) with qualitative case studies
+5. Evaluation results comparing the five strategies across two models (900 total runs)
+6. Presentation with findings
 7. This repository with documentation and reproducible experiments
-
-## Project Phases
-
-
-| Phase | What                | Tasks                                                                                                           |
-| ----- | ------------------- | --------------------------------------------------------------------------------------------------------------- |
-| 1     | Corpus + baseline   | T00 scaffold, T01 document parser, T02 embeddings, T03 retriever, T04 generator, T05 strategy 0, T06 strategy 1 |
-| 2     | MCP + filtering     | T07 auth + MCP server, T08 strategy 2, T09 test set, T11 strategy 3                                             |
-| 3     | Taint-aware guard   | T12 PolicyEngine, T13 strategy 4                                                                                |
-| 4     | Evaluation + report | T10 evaluation harness, T14 LLM-as-judge, T15 results & report                                                  |
-
-
-Full task specs with interfaces, code, acceptance criteria, and dependencies are found in GitHub Projects of this repo.
-
-## Key Files to Read First
-
-1. **This README** — you are here
-2. `**src/models.py`** — shared Pydantic data structures used everywhere
-3. `**src/strategies/base.py`** — the StrategyBase interface every strategy implements
-
